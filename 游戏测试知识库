@@ -19,7 +19,16 @@ def analyze_crash_logs(log_path):
         for line in f:
             match = crash_pattern.search(line)
             if match:
-                error_type = match.group(1)
+                error_type = ## 总结
+
+以上代码实例展示了游戏测试知识库中的核心技术实现，涵盖了：
+
+1. **基础测试脚本**：日志分析、性能监控、网络测试
+2. **游戏功能测试**：技能系统、经济系统、UI自动化
+3. **性能测试工具**：帧率监控、性能报告生成
+4. **测试数据管理**：数据生成、报告自动化
+
+这些代码可以直接用于实际测试工作，也可以作为学习参考，帮助你构建自己的游戏测试工具链。知识库的价值不仅在于知识的积累，更在于将这些知识转化为可执行的工具和实践能力。match.group(1)
                 error_patterns[error_type] += 1
                 
     # 输出统计结果
@@ -917,15 +926,1107 @@ report.export_to_excel("game_test_report.xlsx")
 report.generate_html_report("game_test_report.html")
 ```
 
----
+# 五、个人知识库持续进化系统
 
-## 总结
+## 5.1 智能知识更新机制
 
-以上代码实例展示了游戏测试知识库中的核心技术实现，涵盖了：
+### 自动内容同步系统
+```python
+# 知识库自动更新脚本
+import requests
+import json
+from datetime import datetime
+import hashlib
 
-1. **基础测试脚本**：日志分析、性能监控、网络测试
-2. **游戏功能测试**：技能系统、经济系统、UI自动化
-3. **性能测试工具**：帧率监控、性能报告生成
-4. **测试数据管理**：数据生成、报告自动化
+class KnowledgeBaseUpdater:
+    def __init__(self, base_url, api_key):
+        self.base_url = base_url
+        self.api_key = api_key
+        self.update_log = []
+        
+    def check_for_updates(self):
+        """检查知识库更新"""
+        try:
+            # 获取知识库最新版本信息
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+            response = requests.get(f"{self.base_url}/api/version", headers=headers)
+            latest_version = response.json()
+            
+            # 读取本地版本信息
+            try:
+                with open('knowledge_version.json', 'r') as f:
+                    local_version = json.load(f)
+            except FileNotFoundError:
+                local_version = {"version": "0.0.0"}
+            
+            # 比较版本
+            if self.compare_versions(latest_version['version'], local_version['version']) > 0:
+                print(f"发现新版本: {local_version['version']} -> {latest_version['version']}")
+                return latest_version
+            else:
+                print("当前已是最新版本")
+                return None
+                
+        except Exception as e:
+            print(f"检查更新失败: {e}")
+            return None
+    
+    def compare_versions(self, version1, version2):
+        """比较版本号"""
+        v1 = list(map(int, version1.split('.')))
+        v2 = list(map(int, version2.split('.')))
+        for i in range(max(len(v1), len(v2))):
+            num1 = v1[i] if i < len(v1) else 0
+            num2 = v2[i] if i < len(v2) else 0
+            if num1 > num2:
+                return 1
+            elif num1 < num2:
+                return -1
+        return 0
+    
+    def download_updates(self, update_info):
+        """下载更新内容"""
+        print(f"开始下载更新: {update_info['title']}")
+        
+        for content in update_info['contents']:
+            try:
+                # 下载内容文件
+                response = requests.get(content['download_url'])
+                content_data = response.json()
+                
+                # 计算文件哈希值
+                file_hash = hashlib.sha256(json.dumps(content_data).encode()).hexdigest()
+                
+                if file_hash == content['hash']:
+                    # 保存更新内容
+                    filename = f"updates/{content['category']}/{content['id']}.json"
+                    os.makedirs(os.path.dirname(filename), exist_ok=True)
+                    
+                    with open(filename, 'w', encoding='utf-8') as f:
+                        json.dump(content_data, f, ensure_ascii=False, indent=2)
+                    
+                    # 记录更新日志
+                    self.update_log.append({
+                        'timestamp': datetime.now().isoformat(),
+                        'content_id': content['id'],
+                        'category': content['category'],
+                        'action': 'download',
+                        'status': 'success'
+                    })
+                    
+                    print(f"✓ 已下载: {content['title']}")
+                else:
+                    print(f"✗ 文件校验失败: {content['title']}")
+                    
+            except Exception as e:
+                print(f"下载失败: {content['title']} - {e}")
+    
+    def apply_updates(self):
+        """应用更新到本地知识库"""
+        updates_dir = "updates"
+        applied_count = 0
+        
+        for category in os.listdir(updates_dir):
+            category_dir = os.path.join(updates_dir, category)
+            if os.path.isdir(category_dir):
+                for update_file in os.listdir(category_dir):
+                    if update_file.endswith('.json'):
+                        update_path = os.path.join(category_dir, update_file)
+                        
+                        try:
+                            with open(update_path, 'r', encoding='utf-8') as f:
+                                update_content = json.load(f)
+                            
+                            # 合并到本地知识库
+                            self.merge_into_knowledge_base(category, update_content)
+                            applied_count += 1
+                            
+                            # 记录应用日志
+                            self.update_log.append({
+                                'timestamp': datetime.now().isoformat(),
+                                'content_id': update_content.get('id', ''),
+                                'category': category,
+                                'action': 'apply',
+                                'status': 'success'
+                            })
+                            
+                            # 删除已应用的更新文件
+                            os.remove(update_path)
+                            
+                        except Exception as e:
+                            print(f"应用更新失败: {update_file} - {e}")
+        
+        print(f"已应用 {applied_count} 个更新")
+        return applied_count
+    
+    def merge_into_knowledge_base(self, category, content):
+        """将更新内容合并到知识库"""
+        # 根据类别合并到不同的知识库文件
+        knowledge_files = {
+            'python': 'knowledge/python_skills.json',
+            'testing': 'knowledge/testing_methods.json',
+            'tools': 'knowledge/tools_library.json',
+            'cases': 'knowledge/case_studies.json'
+        }
+        
+        if category in knowledge_files:
+            file_path = knowledge_files[category]
+            
+            # 加载现有知识
+            if os.path.exists(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+            else:
+                existing_data = []
+            
+            # 合并数据（避免重复）
+            existing_ids = {item.get('id') for item in existing_data}
+            if content.get('id') not in existing_ids:
+                existing_data.append(content)
+                
+                # 保存合并后的数据
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(existing_data, f, ensure_ascii=False, indent=2)
+                
+                print(f"✓ 已合并到: {file_path}")
+    
+    def run_update_process(self):
+        """运行完整的更新流程"""
+        print("=== 知识库更新流程开始 ===")
+        
+        # 1. 检查更新
+        update_info = self.check_for_updates()
+        if not update_info:
+            print("无需更新")
+            return
+        
+        # 2. 下载更新
+        self.download_updates(update_info)
+        
+        # 3. 应用更新
+        applied = self.apply_updates()
+        
+        # 4. 更新本地版本
+        if applied > 0:
+            with open('knowledge_version.json', 'w') as f:
+                json.dump({
+                    'version': update_info['version'],
+                    'updated_at': datetime.now().isoformat(),
+                    'updates_applied': applied
+                }, f, indent=2)
+        
+        # 5. 保存更新日志
+        self.save_update_log()
+        
+        print("=== 知识库更新流程完成 ===")
+    
+    def save_update_log(self):
+        """保存更新日志"""
+        log_file = 'logs/update_history.json'
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        
+        # 加载历史日志
+        if os.path.exists(log_file):
+            with open(log_file, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+        else:
+            history = []
+        
+        # 添加新日志
+        history.extend(self.update_log)
+        
+        # 保存
+        with open(log_file, 'w', encoding='utf-8') as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+```
 
-这些代码可以直接用于实际测试工作，也可以作为学习参考，帮助你构建自己的游戏测试工具链。知识库的价值不仅在于知识的积累，更在于将这些知识转化为可执行的工具和实践能力。
+## 5.2 AI智能助手集成
+
+### ChatGPT知识库助手
+```python
+# AI助手集成脚本
+import openai
+import json
+from typing import List, Dict
+
+class AIGameTestingAssistant:
+    def __init__(self, api_key, knowledge_base_path="knowledge_base"):
+        openai.api_key = api_key
+        self.knowledge_base_path = knowledge_base_path
+        self.conversation_history = []
+        
+    def load_knowledge_context(self, topic: str) -> str:
+        """加载相关知识点作为上下文"""
+        context_parts = []
+        
+        # 根据主题加载相关知识文件
+        topic_files = {
+            '性能测试': ['performance_testing.json', 'tools_library.json'],
+            '自动化测试': ['automation_frameworks.json', 'python_skills.json'],
+            '游戏测试': ['game_testing_methods.json', 'case_studies.json'],
+            '安全测试': ['security_testing.json', 'tools_library.json']
+        }
+        
+        if topic in topic_files:
+            for file_name in topic_files[topic]:
+                file_path = os.path.join(self.knowledge_base_path, file_name)
+                if os.path.exists(file_path):
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        # 提取相关内容
+                        for item in data[:10]:  # 限制数量
+                            context_parts.append(f"知识点: {item.get('title', '')}")
+                            context_parts.append(f"内容: {item.get('content', '')}")
+        
+        return "\n".join(context_parts) if context_parts else "暂无相关知识点"
+    
+    def generate_response(self, question: str, use_knowledge_base: bool = True) -> str:
+        """生成AI回答"""
+        try:
+            # 构建对话历史
+            messages = [
+                {
+                    "role": "system",
+                    "content": "你是一个专业的游戏测试专家，根据提供的知识库内容回答问题。"
+                }
+            ]
+            
+            # 添加相关知识点作为上下文
+            if use_knowledge_base:
+                # 简单提取问题关键词
+                keywords = self.extract_keywords(question)
+                context = self.load_knowledge_context(keywords[0] if keywords else "游戏测试")
+                
+                messages.append({
+                    "role": "system",
+                    "content": f"以下是相关知识库内容：\n{context}"
+                })
+            
+            # 添加对话历史
+            for history in self.conversation_history[-5:]:  # 保留最近5条
+                messages.append(history)
+            
+            # 添加当前问题
+            messages.append({"role": "user", "content": question})
+            
+            # 调用OpenAI API
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                temperature=0.7,
+                max_tokens=1000
+            )
+            
+            answer = response.choices[0].message.content
+            
+            # 记录对话历史
+            self.conversation_history.append({"role": "user", "content": question})
+            self.conversation_history.append({"role": "assistant", "content": answer})
+            
+            # 保存对话记录
+            self.save_conversation(question, answer)
+            
+            return answer
+            
+        except Exception as e:
+            return f"抱歉，生成回答时出现错误：{str(e)}"
+    
+    def extract_keywords(self, text: str) -> List[str]:
+        """提取关键词"""
+        # 简单的关键词提取（实际可以使用NLP库）
+        common_keywords = {
+            '性能': '性能测试',
+            '帧率': '性能测试',
+            '内存': '性能测试',
+            '自动化': '自动化测试',
+            '脚本': '自动化测试',
+            '安全': '安全测试',
+            '漏洞': '安全测试',
+            '兼容性': '兼容性测试',
+            '机型': '兼容性测试',
+            '游戏': '游戏测试',
+            '技能': '游戏测试'
+        }
+        
+        keywords = []
+        for word, category in common_keywords.items():
+            if word in text:
+                keywords.append(category)
+        
+        return list(set(keywords))  # 去重
+    
+    def save_conversation(self, question: str, answer: str):
+        """保存对话记录"""
+        conversation_file = 'logs/ai_conversations.json'
+        
+        # 加载历史对话
+        if os.path.exists(conversation_file):
+            with open(conversation_file, 'r', encoding='utf-8') as f:
+                conversations = json.load(f)
+        else:
+            conversations = []
+        
+        # 添加新对话
+        conversations.append({
+            "timestamp": datetime.now().isoformat(),
+            "question": question,
+            "answer": answer
+        })
+        
+        # 只保留最近100条对话
+        if len(conversations) > 100:
+            conversations = conversations[-100:]
+        
+        # 保存
+        with open(conversation_file, 'w', encoding='utf-8') as f:
+            json.dump(conversations, f, ensure_ascii=False, indent=2)
+    
+    def generate_test_cases(self, feature_description: str) -> Dict:
+        """使用AI生成测试用例"""
+        prompt = f"""
+        请根据以下游戏功能描述，生成详细的测试用例：
+        
+        功能描述：{feature_description}
+        
+        请按照以下格式生成测试用例：
+        1. 功能测试用例（正常流程）
+        2. 边界测试用例（边界条件）
+        3. 异常测试用例（错误处理）
+        4. 性能测试用例（性能要求）
+        5. 兼容性测试用例（不同环境）
+        
+        每个测试用例应包括：
+        - 测试用例ID
+        - 测试标题
+        - 前置条件
+        - 测试步骤
+        - 预期结果
+        - 优先级
+        """
+        
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "你是一个专业的游戏测试工程师。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1500
+            )
+            
+            test_cases = response.choices[0].message.content
+            
+            # 解析测试用例为结构化数据
+            structured_cases = self.parse_test_cases(test_cases)
+            
+            # 保存到知识库
+            self.save_to_knowledge_base(feature_description, structured_cases)
+            
+            return structured_cases
+            
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def parse_test_cases(self, test_cases_text: str) -> Dict:
+        """解析测试用例文本为结构化数据"""
+        # 简单的解析逻辑（实际可以更复杂）
+        lines = test_cases_text.split('\n')
+        categories = []
+        current_category = None
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith(('1.', '2.', '3.', '4.', '5.')):
+                current_category = line
+                categories.append({"category": line, "cases": []})
+            elif line.startswith('-') and current_category:
+                # 解析测试用例
+                test_case = {
+                    "id": f"TC_{len(categories[-1]['cases']) + 1:03d}",
+                    "description": line[1:].strip(),
+                    "type": "manual",  # 默认手动测试
+                    "priority": "Medium"
+                }
+                categories[-1]["cases"].append(test_case)
+        
+        return {"categories": categories}
+    
+    def save_to_knowledge_base(self, feature: str, test_cases: Dict):
+        """保存AI生成的测试用例到知识库"""
+        test_cases_file = 'knowledge/ai_generated_cases.json'
+        
+        # 加载现有用例
+        if os.path.exists(test_cases_file):
+            with open(test_cases_file, 'r', encoding='utf-8') as f:
+                existing_cases = json.load(f)
+        else:
+            existing_cases = []
+        
+        # 添加新用例
+        new_entry = {
+            "id": f"AI_{datetime.now():%Y%m%d_%H%M%S}",
+            "feature": feature,
+            "generated_at": datetime.now().isoformat(),
+            "test_cases": test_cases,
+            "status": "generated"  # generated, reviewed, approved
+        }
+        
+        existing_cases.append(new_entry)
+        
+        # 保存
+        with open(test_cases_file, 'w', encoding='utf-8') as f:
+            json.dump(existing_cases, f, ensure_ascii=False, indent=2)
+        
+        print(f"✓ 已保存 {len(test_cases.get('categories', []))} 个测试用例类别")
+
+# 使用示例
+assistant = AIGameTestingAssistant("your-openai-api-key")
+
+# 提问
+question = "如何测试游戏中的技能冷却时间？"
+answer = assistant.generate_response(question, use_knowledge_base=True)
+print(f"问题: {question}")
+print(f"回答: {answer[:200]}...")
+
+# 生成测试用例
+feature_desc = "玩家组队功能：玩家可以创建队伍，邀请其他玩家，队伍成员可以共享任务和奖励。"
+test_cases = assistant.generate_test_cases(feature_desc)
+print(f"生成了 {len(test_cases.get('categories', []))} 个测试用例类别")
+```
+
+## 5.3 学习进度跟踪系统
+
+```python
+# 个人学习进度跟踪系统
+import sqlite3
+from datetime import datetime, timedelta
+
+class LearningProgressTracker:
+    def __init__(self, db_path="learning_progress.db"):
+        self.db_path = db_path
+        self.init_database()
+    
+    def init_database(self):
+        """初始化数据库"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # 创建学习主题表
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS learning_topics (
+            id INTEGER PRIMARY KEY,
+            topic_name TEXT NOT NULL,
+            category TEXT,
+            priority INTEGER DEFAULT 3,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        # 创建学习记录表
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS learning_records (
+            id INTEGER PRIMARY KEY,
+            topic_id INTEGER,
+            study_date DATE NOT NULL,
+            duration_minutes INTEGER,
+            content_covered TEXT,
+            notes TEXT,
+            confidence_level INTEGER, -- 1-5分
+            FOREIGN KEY (topic_id) REFERENCES learning_topics (id)
+        )
+        ''')
+        
+        # 创建学习目标表
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS learning_goals (
+            id INTEGER PRIMARY KEY,
+            goal_name TEXT NOT NULL,
+            target_date DATE,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        # 创建目标与主题关联表
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS goal_topics (
+            goal_id INTEGER,
+            topic_id INTEGER,
+            PRIMARY KEY (goal_id, topic_id),
+            FOREIGN KEY (goal_id) REFERENCES learning_goals (id),
+            FOREIGN KEY (topic_id) REFERENCES learning_topics (id)
+        )
+        ''')
+        
+        conn.commit()
+        conn.close()
+    
+    def add_learning_topic(self, topic_name, category, priority=3):
+        """添加学习主题"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        INSERT INTO learning_topics (topic_name, category, priority)
+        VALUES (?, ?, ?)
+        ''', (topic_name, category, priority))
+        
+        topic_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        print(f"添加学习主题: {topic_name} (ID: {topic_id})")
+        return topic_id
+    
+    def record_study_session(self, topic_id, duration_minutes, content_covered, notes="", confidence_level=3):
+        """记录学习记录"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        today = datetime.now().date().isoformat()
+        
+        cursor.execute('''
+        INSERT INTO learning_records (topic_id, study_date, duration_minutes, content_covered, notes, confidence_level)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ''', (topic_id, today, duration_minutes, content_covered, notes, confidence_level))
+        
+        # 更新主题的更新时间
+        cursor.execute('''
+        UPDATE learning_topics 
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        ''', (topic_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"记录学习: {duration_minutes}分钟，主题ID: {topic_id}")
+    
+    def set_learning_goal(self, goal_name, target_date, topic_ids=None):
+        """设置学习目标"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # 添加目标
+        cursor.execute('''
+        INSERT INTO learning_goals (goal_name, target_date)
+        VALUES (?, ?)
+        ''', (goal_name, target_date))
+        
+        goal_id = cursor.lastrowid
+        
+        # 关联主题
+        if topic_ids:
+            for topic_id in topic_ids:
+                cursor.execute('''
+                INSERT INTO goal_topics (goal_id, topic_id)
+                VALUES (?, ?)
+                ''', (goal_id, topic_id))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"设置学习目标: {goal_name} (ID: {goal_id})")
+        return goal_id
+    
+    def get_study_statistics(self, days=30):
+        """获取学习统计"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # 计算起始日期
+        start_date = (datetime.now() - timedelta(days=days)).date().isoformat()
+        
+        # 总学习时间
+        cursor.execute('''
+        SELECT SUM(duration_minutes) FROM learning_records
+        WHERE study_date >= ?
+        ''', (start_date,))
+        
+        total_minutes = cursor.fetchone()[0] or 0
+        
+        # 学习天数
+        cursor.execute('''
+        SELECT COUNT(DISTINCT study_date) FROM learning_records
+        WHERE study_date >= ?
+        ''', (start_date,))
+        
+        study_days = cursor.fetchone()[0]
+        
+        # 各主题学习时间
+        cursor.execute('''
+        SELECT t.topic_name, SUM(r.duration_minutes)
+        FROM learning_records r
+        JOIN learning_topics t ON r.topic_id = t.id
+        WHERE r.study_date >= ?
+        GROUP BY t.topic_name
+        ORDER BY SUM(r.duration_minutes) DESC
+        ''', (start_date,))
+        
+        topic_stats = cursor.fetchall()
+        
+        conn.close()
+        
+        stats = {
+            'period_days': days,
+            'total_study_minutes': total_minutes,
+            'total_study_hours': total_minutes / 60,
+            'study_days': study_days,
+            'average_daily_minutes': total_minutes / days if days > 0 else 0,
+            'topic_breakdown': [
+                {'topic': topic, 'minutes': minutes} 
+                for topic, minutes in topic_stats
+            ]
+        }
+        
+        return stats
+    
+    def generate_learning_report(self):
+        """生成学习报告"""
+        stats_30 = self.get_study_statistics(30)
+        stats_7 = self.get_study_statistics(7)
+        
+        report = f"""
+        === 个人学习进度报告 ===
+        生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        
+        一、总体统计
+        最近30天学习时间: {stats_30['total_study_hours']:.1f} 小时
+        最近7天学习时间: {stats_7['total_study_hours']:.1f} 小时
+        学习天数: {stats_30['study_days']} 天
+        日均学习: {stats_30['average_daily_minutes']:.1f} 分钟
+        
+        二、主题分布（最近30天）
+        """
+        
+        for item in stats_30['topic_breakdown'][:5]:  # 前5个主题
+            percentage = (item['minutes'] / stats_30['total_study_minutes'] * 100) if stats_30['total_study_minutes'] > 0 else 0
+            report += f"  {item['topic']}: {item['minutes']}分钟 ({percentage:.1f}%)\n"
+        
+        # 获取未学习主题
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT topic_name FROM learning_topics t
+        WHERE NOT EXISTS (
+            SELECT 1 FROM learning_records r 
+            WHERE r.topic_id = t.id 
+            AND r.study_date >= date('now', '-30 days')
+        )
+        ''')
+        
+        inactive_topics = cursor.fetchall()
+        conn.close()
+        
+        if inactive_topics:
+            report += "\n三、需要关注的主题（30天内未学习）\n"
+            for topic in inactive_topics[:5]:
+                report += f"  {topic[0]}\n"
+        
+        return report
+    
+    def suggest_next_topic(self):
+        """推荐下一个学习主题"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # 查找优先级高但学习时间少的主题
+        cursor.execute('''
+        SELECT t.id, t.topic_name, t.priority, 
+               COALESCE(SUM(r.duration_minutes), 0) as total_minutes
+        FROM learning_topics t
+        LEFT JOIN learning_records r ON t.id = r.topic_id
+        GROUP BY t.id, t.topic_name, t.priority
+        ORDER BY t.priority DESC, total_minutes ASC
+        LIMIT 3
+        ''')
+        
+        suggestions = cursor.fetchall()
+        conn.close()
+        
+        if suggestions:
+            print("推荐学习主题：")
+            for topic_id, topic_name, priority, minutes in suggestions:
+                print(f"  {topic_name} (优先级: {priority}, 已学: {minutes}分钟)")
+            
+            return suggestions[0][0]  # 返回第一个推荐的topic_id
+        else:
+            print("暂无推荐主题")
+            return None
+
+# 使用示例
+tracker = LearningProgressTracker()
+
+# 添加学习主题
+python_id = tracker.add_learning_topic("Python高级特性", "编程", priority=2)
+testing_id = tracker.add_learning_topic("自动化测试框架", "测试", priority=1)
+
+# 记录学习
+tracker.record_study_session(python_id, 120, "装饰器、生成器、上下文管理器", "理解比较透彻", confidence_level=4)
+tracker.record_study_session(testing_id, 90, "Pytest参数化和Fixture", "还需要多练习", confidence_level=3)
+
+# 设置目标
+tracker.set_learning_goal("掌握Python自动化测试", "2024-12-31", [python_id, testing_id])
+
+# 生成报告
+report = tracker.generate_learning_report()
+print(report)
+
+# 获取建议
+next_topic = tracker.suggest_next_topic()
+```
+
+## 5.4 知识质量评估系统
+
+```python
+# 知识质量评估脚本
+import json
+from datetime import datetime
+
+class KnowledgeQualityAssessor:
+    def __init__(self):
+        self.assessment_criteria = {
+            'accuracy': {
+                'weight': 0.3,
+                'indicators': ['有权威来源', '经过验证', '无矛盾信息']
+            },
+            'completeness': {
+                'weight': 0.25,
+                'indicators': ['覆盖全面', '有示例', '有实践指导']
+            },
+            'currency': {
+                'weight': 0.2,
+                'indicators': ['更新及时', '技术前沿', '无过时内容']
+            },
+            'clarity': {
+                'weight': 0.15,
+                'indicators': ['结构清晰', '表述易懂', '图文并茂']
+            },
+            'usability': {
+                'weight': 0.1,
+                'indicators': ['可直接使用', '有代码示例', '有模板']
+            }
+        }
+    
+    def assess_knowledge_item(self, item, category):
+        """评估单个知识条目"""
+        scores = {}
+        total_score = 0
+        
+        for criterion, info in self.assessment_criteria.items():
+            criterion_score = 0
+            max_possible = len(info['indicators'])
+            
+            # 根据具体内容评分（简化的评分逻辑）
+            if criterion == 'accuracy':
+                if item.get('references'):
+                    criterion_score += 1
+                if item.get('verified'):
+                    criterion_score += 1
+                if not item.get('contradictions'):
+                    criterion_score += 1
+            
+            elif criterion == 'completeness':
+                if item.get('content'):
+                    criterion_score += 1
+                if item.get('examples'):
+                    criterion_score += 1
+                if item.get('practical_guide'):
+                    criterion_score += 1
+            
+            elif criterion == 'currency':
+                updated_at = item.get('updated_at', '')
+                if updated_at:
+                    # 检查是否在一年内更新
+                    try:
+                        update_date = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                        days_since_update = (datetime.now() - update_date).days
+                        if days_since_update < 365:
+                            criterion_score += 1
+                    except:
+                        pass
+                
+                if item.get('is_advanced'):
+                    criterion_score += 1
+                if not item.get('deprecated'):
+                    criterion_score += 1
+            
+            elif criterion == 'clarity':
+                if item.get('structure_rating', 0) >= 3:
+                    criterion_score += 1
+                if item.get('readability', 0) >= 3:
+                    criterion_score += 1
+                if item.get('has_visuals'):
+                    criterion_score += 1
+            
+            elif criterion == 'usability':
+                if item.get('code_examples'):
+                    criterion_score += 1
+                if item.get('templates'):
+                    criterion_score += 1
+                if item.get('ready_to_use'):
+                    criterion_score += 1
+            
+            # 计算加权分数
+            weighted_score = (criterion_score / max_possible) * info['weight'] * 100
+            scores[criterion] = weighted_score
+            total_score += weighted_score
+        
+        # 添加质量标签
+        quality_level = self.get_quality_level(total_score)
+        
+        assessment = {
+            'item_id': item.get('id'),
+            'title': item.get('title'),
+            'category': category,
+            'total_score': round(total_score, 1),
+            'quality_level': quality_level,
+            'criterion_scores': scores,
+            'assessed_at': datetime.now().isoformat(),
+            'recommendations': self.generate_recommendations(scores)
+        }
+        
+        return assessment
+    
+    def get_quality_level(self, score):
+        """根据分数获取质量等级"""
+        if score >= 90:
+            return '优秀'
+        elif score >= 80:
+            return '良好'
+        elif score >= 70:
+            return '中等'
+        elif score >= 60:
+            return '合格'
+        else:
+            return '需要改进'
+    
+    def generate_recommendations(self, scores):
+        """生成改进建议"""
+        recommendations = []
+        
+        if scores.get('accuracy', 0) < 20:
+            recommendations.append("增加权威来源引用")
+            recommendations.append("进行实际验证")
+        
+        if scores.get('completeness', 0) < 15:
+            recommendations.append("补充更多示例")
+            recommendations.append("添加实践指导")
+        
+        if scores.get('currency', 0) < 12:
+            recommendations.append("更新过时内容")
+            recommendations.append("添加最新技术信息")
+        
+        if scores.get('clarity', 0) < 10:
+            recommendations.append("优化内容结构")
+            recommendations.append("添加图表说明")
+        
+        if scores.get('usability', 0) < 8:
+            recommendations.append("提供可直接使用的代码")
+            recommendations.append("添加模板文件")
+        
+        return recommendations
+    
+    def assess_knowledge_base(self, knowledge_dir="knowledge"):
+        """评估整个知识库"""
+        assessments = []
+        total_items = 0
+        
+        for category_file in os.listdir(knowledge_dir):
+            if category_file.endswith('.json'):
+                file_path = os.path.join(knowledge_dir, category_file)
+                category = category_file.replace('.json', '')
+                
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        knowledge_items = json.load(f)
+                    
+                    for item in knowledge_items:
+                        assessment = self.assess_knowledge_item(item, category)
+                        assessments.append(assessment)
+                        total_items += 1
+                        
+                except Exception as e:
+                    print(f"评估文件失败: {file_path} - {e}")
+        
+        # 计算总体统计
+        if assessments:
+            total_score = sum(a['total_score'] for a in assessments)
+            avg_score = total_score / len(assessments)
+            
+            # 各质量等级统计
+            quality_counts = {}
+            for a in assessments:
+                level = a['quality_level']
+                quality_counts[level] = quality_counts.get(level, 0) + 1
+            
+            # 生成评估报告
+            report = {
+                'total_items_assessed': total_items,
+                'average_score': round(avg_score, 1),
+                'quality_distribution': quality_counts,
+                'assessments': assessments,
+                'generated_at': datetime.now().isoformat()
+            }
+            
+            # 保存评估结果
+            output_file = f"assessments/knowledge_quality_{datetime.now():%Y%m%d}.json"
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(report, f, ensure_ascii=False, indent=2)
+            
+            print(f"知识库评估完成！平均分: {avg_score:.1f}")
+            print(f"质量分布: {quality_counts}")
+            
+            return report
+        else:
+            print("没有可评估的知识条目")
+            return None
+    
+    def generate_quality_report_html(self, assessment_data):
+        """生成HTML格式的质量报告"""
+        html_template = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>知识库质量评估报告</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                .summary { background: #f5f5f5; padding: 20px; border-radius: 5px; }
+                .metric { display: inline-block; margin: 10px 20px; }
+                .metric-value { font-size: 24px; font-weight: bold; }
+                .quality-good { color: #27ae60; }
+                .quality-fair { color: #f39c12; }
+                .quality-poor { color: #e74c3c; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th { background: #3498db; color: white; padding: 10px; text-align: left; }
+                td { padding: 10px; border-bottom: 1px solid #ddd; }
+                .priority-high { background: #fadbd8; }
+                .priority-medium { background: #fef9e7; }
+                .priority-low { background: #d5f4e6; }
+            </style>
+        </head>
+        <body>
+            <h1>知识库质量评估报告</h1>
+            <p>生成时间: {report_date}</p>
+            
+            <div class="summary">
+                <h2>总体评估</h2>
+                <div class="metric">
+                    <div>评估条目数</div>
+                    <div class="metric-value">{total_items}</div>
+                </div>
+                <div class="metric">
+                    <div>平均质量分</div>
+                    <div class="metric-value {avg_score_class}">{avg_score}</div>
+                </div>
+                <div class="metric">
+                    <div>优秀条目</div>
+                    <div class="metric-value">{excellent_count}</div>
+                </div>
+                <div class="metric">
+                    <div>需要改进</div>
+                    <div class="metric-value quality-poor">{improve_count}</div>
+                </div>
+            </div>
+            
+            <h2>详细评估结果</h2>
+            <table>
+                <tr>
+                    <th>标题</th>
+                    <th>类别</th>
+                    <th>质量分</th>
+                    <th>等级</th>
+                    <th>改进建议</th>
+                </tr>
+                {assessment_rows}
+            </table>
+            
+            <h2>改进优先级</h2>
+            <p>以下条目需要优先改进：</p>
+            <ul>
+                {priority_list}
+            </ul>
+        </body>
+        </html>
+        """
+        
+        # 准备数据
+        report_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        total_items = assessment_data['total_items_assessed']
+        avg_score = assessment_data['average_score']
+        
+        # 确定平均分样式
+        if avg_score >= 80:
+            avg_score_class = "quality-good"
+        elif avg_score >= 60:
+            avg_score_class = "quality-fair"
+        else:
+            avg_score_class = "quality-poor"
+        
+        # 统计各等级数量
+        quality_dist = assessment_data['quality_distribution']
+        excellent_count = quality_dist.get('优秀', 0)
+        improve_count = quality_dist.get('需要改进', 0)
+        
+        # 生成评估行
+        assessment_rows = ""
+        for item in assessment_data['assessments'][:50]:  # 只显示前50条
+            title = item['title'][:50] + "..." if len(item['title']) > 50 else item['title']
+            
+            # 根据分数确定优先级
+            if item['total_score'] < 60:
+                priority_class = "priority-high"
+                priority_text = "高"
+            elif item['total_score'] < 70:
+                priority_class = "priority-medium"
+                priority_text = "中"
+            else:
+                priority_class = "priority-low"
+                priority_text = "低"
+            
+            assessment_rows += f"""
+            <tr class="{priority_class}">
+                <td>{title}</td>
+                <td>{item['category']}</td>
+                <td>{item['total_score']}</td>
+                <td>{item['quality_level']}</td>
+                <td>{', '.join(item['recommendations'][:2])}</td>
+            </tr>
+            """
+        
+        # 生成优先级列表
+        priority_items = [a for a in assessment_data['assessments'] if a['total_score'] < 70]
+        priority_items.sort(key=lambda x: x['total_score'])
+        
+        priority_list = ""
+        for item in priority_items[:10]:  # 前10个最需要改进的
+            priority_list += f"<li>{item['title']} - 得分: {item['total_score']}</li>\n"
+        
+        # 填充模板
+        html_content = html_template.format(
+            report_date=report_date,
+            total_items=total_items,
+            avg_score=avg_score,
+            avg_score_class=avg_score_class,
+            excellent_count=excellent_count,
+            improve_count=improve_count,
+            assessment_rows=assessment_rows,
+            priority_list=priority_list
+        )
+        
+        # 保存HTML文件
+        output_file = f"reports/quality_report_{datetime.now():%Y%m%d_%H%M%S}.html"
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        print(f"HTML报告已生成: {output_file}")
+        return output_file
+
+
